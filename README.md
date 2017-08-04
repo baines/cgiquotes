@@ -13,8 +13,9 @@ text     :: *(any char except '\n')
 ```
 
 Edit quotes.h to change the location of `QUOTES_ROOT`, and add files there
-named data-<name>. Make sure the name is html-safe.
+named data-\<name\>. Make sure the name is html-safe.
 
-Later version will hopefully support PUT / POST / PATCH to actually add/update
-quotes. Then it can be used as a replacement for the gist in [insobot](https://github.com/baines/insobot).
+Later versions will hopefully support PUT / POST / PATCH to actually add/update
+quotes. Then it can be used as a replacement for the gist in
+[insobot](https://github.com/baines/insobot)'s mod_quotes.
 
