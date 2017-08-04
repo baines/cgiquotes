@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+<head>
+	<base href="/quotes/`qname`/">
+	<link rel="stylesheet" type="text/css" href="/static/quotes.css">
+	<link rel="shortcut icon" href="/static/quotes.ico">
+	<title>Insobot Quotes &raquo; `qname`</title>
+</head>
+<body>
+	<header>
+		<a href="/quotes/">Insobot Quotes</a> &raquo;
+		<a href="/quotes/`qname`">`qname`</a>
+		<span id="fmts">
+			<a href="/quotes/`qname`.json">json</a>|
+			<a href="/quotes/`qname`.csv">csv</a>|
+			<a href="/quotes/`qname`.raw">raw</a>
+		</span>
+	</header>
+	<main>
+		<table>
+		<thead>
+			<tr><td>ID</td><td>Quote</td><td>Date</td></tr>
+		</thead>
+		<tbody>
+`qdata`		</tbody>
+		</table>
+	</main>
+	<footer>
+	&copy; 2017 Alex Baines
+	<a id="powered" href="https://github.com/baines/cgiquotes">Powered by CGIQuotes</a>
+	</footer>
+</body>
+</html>
