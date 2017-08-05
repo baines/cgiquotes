@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <glob.h>
+#include <errno.h>
 #include "quotes.h"
 
 void check_auth(void){
@@ -230,7 +231,7 @@ void handle_get(struct qset* q, int id, int type){
 
 	if(id == Q_ID_RANDOM){
 		int new_id = atoi(q->lines[rand()%sb_count(q->lines)]);
-		printf("Status: 302 Moved Temporarily\r\nLocation: /quotes/%s/%d\r\n\r\n", q->name, new_id);
+		printf("Status: 302 Found\r\nLocation: /quotes/%s/%d\r\n\r\n", q->name, new_id);
 	} else if(id != Q_ID_INVALID){
 		handle_get_single(q, id, type);
 	} else {
@@ -238,18 +239,136 @@ void handle_get(struct qset* q, int id, int type){
 	}
 }
 
-void handle_put(struct qset* q, int id){
-	(void)q;
-	(void)id;
-	puts("Content-Type: text/plain; charset=utf-8\r\n\r");
-	puts("put");
+void handle_post(struct qset* q, int id){
+	if(id == Q_ID_RANDOM){
+		exit_error(400);
+	}
+
+	int len = atoi(util_getenv("CONTENT_LENGTH"));
+	if(len <= 0 || len >= 510){
+		exit_error(400);
+	}
+
+	// read post data from stdin
+	char buf[512];
+	ssize_t n = TEMP_FAILURE_RETRY(read(STDIN_FILENO, buf, len));
+
+	if(n < 0 || q->fd == -1){
+		exit_error(501);
+	}
+	buf[n] = '\0';
+
+	// remove chars that would interfere with the file format
+	for(char* c = buf; c < (buf+len); ++c){
+		if(*c == '\r' || *c == '\n') *c = ' ';
+	}
+
+	if(id == Q_ID_INVALID){
+
+		// creating new quote
+		time_t now = time(NULL);
+		int id = 0;
+		sb_each(l, q->lines){
+			int i = atoi(*l);
+			if(i > id) id = (i+1);
+		}
+
+		lseek(q->fd, 0, SEEK_END);
+		dprintf(q->fd, "%d,%zu,%s\n", id, (size_t)now, buf);
+
+		printf("Content-Type: text/plain; charset=utf-8\r\n\r\n%d,%zu\n", id, (size_t)now);
+	} else {
+
+		// updating existing quote
+		size_t epoch = 0;
+		int text_offset = -1;
+
+		// make sure post data is of the form '[epoch]:[text]'
+		bool valid = sscanf(buf, "%zu:%n", &epoch, &text_offset) == 1;
+		if(!valid && *buf == ':'){
+			text_offset = 1;
+		} else if(!valid){
+			exit_error(400);
+		}
+
+		// find the line with corresponding id
+		int line = -1;
+		sb_each(l, q->lines){
+			if(atoi(*l) == id){
+				line = l - q->lines;
+				break;
+			}
+		}
+		if(line == -1){
+			exit_error(404);
+		}
+
+		// get the values to be written, might might be carried over from the current line
+		const char* text;
+		{
+			int old_off = 0;
+			size_t old_epoch;
+			if(sscanf(q->lines[line], "%*d,%zu,%n", &old_epoch, &old_off) != 1 || old_off <= 0){
+				exit_error(501);
+			}
+
+			text = (text_offset <= 0) ? q->lines[line] + old_off : buf + text_offset;
+			if(epoch == 0){
+				epoch = old_epoch;
+			}
+		}
+
+		// write new stuff to the file
+		ftruncate(q->fd, 0);
+		lseek(q->fd, 0, SEEK_SET);
+
+		sb_each(l, q->lines){
+			if(l - q->lines == line){
+				dprintf(q->fd, "%d,%zu,%s\n", id, epoch, text);
+			} else {
+				dprintf(q->fd, "%s\n", *l);
+			}
+		}
+
+		puts("Content-Type: text/plain; charset=utf-8\r\n\r");
+	}
+
+	fsync(q->fd);
 }
 
 void handle_delete(struct qset* q, int id){
-	(void)q;
-	(void)id;
+	if(id < 0){
+		exit_error(400);
+	}
+
+	int line = -1;
+	sb_each(l, q->lines){
+		if(atoi(*l) == id){
+			line = l - q->lines;
+			break;
+		}
+	}
+
+	if(line == -1){
+		exit_error(404);
+	}
+
+	if(sb_count(q->lines) == 1){
+		unlink(q->path);
+	} else {
+		ftruncate(q->fd, 0);
+		lseek(q->fd, 0, SEEK_SET);
+
+		sb_each(l, q->lines){
+			if((l - q->lines) != line){
+				dprintf(q->fd, "%s\n", *l);
+			}
+		}
+
+		fsync(q->fd);
+	}
+
 	puts("Content-Type: text/plain; charset=utf-8\r\n\r");
-	puts("delete");
 }
 
 int get_resp_type(const char* req){
@@ -275,8 +394,12 @@ int main(void){
 	int n = sscanf(path, "/quotes/%255[a-z0-9_]/%7[0-9r].%7s", filename, id_str, req_type);
 
 	if(n <= 0){
-		handle_get_index();
-		return 0;
+		if(strcmp(method, "GET") == 0){
+			handle_get_index();
+			return 0;
+		} else {
+			exit_error(400);
+		}
 	} else if(n == 1){
 		sscanf(path, "/quotes/%*[a-z0-9_].%7s", req_type);
 	}
@@ -298,12 +421,12 @@ int main(void){
 		struct qset q = qset_open(filename);
 		handle_get(&q, id, resp_type);
 
-	} else if(strcmp(method, "PUT") == 0){
+	} else if(strcmp(method, "POST") == 0){
 
 		check_auth();
 
 		struct qset q = qset_create(filename);
-		handle_put(&q, id);
+		handle_post(&q, id);
 
 	} else if(strcmp(method, "DELETE") == 0){
 

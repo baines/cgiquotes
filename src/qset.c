@@ -49,7 +49,10 @@ struct qset qset_open(const char* name){
 		if(strncmp(e->d_name, "data-", 5) != 0) continue;
 
 		if(strcmp(e->d_name + 5, name) == 0 && e->d_type == DT_REG){
-			qset.fd = openat(dirfd(dir), e->d_name, O_RDONLY);
+			qset.fd = openat(dirfd(dir), e->d_name, O_RDWR);
+			if(asprintf(&qset.path, QUOTES_ROOT "/%s", e->d_name) == -1){
+				exit_error(501);
+			}
 			break;
 		}
 	}
@@ -70,29 +73,16 @@ struct qset qset_open(const char* name){
 }
 
 struct qset qset_create(const char* name){
+	if(strpbrk(name, "./")){
+		exit_error(400);
+	}
+
 	struct qset qset = {
 		.name = strdup(name),
 	};
-	char* real;
 
-	// construct the full file path in a paranoid manner.
-	{
-		char* path = NULL;
-		if(asprintf(&path, QUOTES_ROOT "/data-%s", name) == -1 || !path){
-			exit_error(501);
-		}
-
-		real = realpath(path, NULL);
-		if(!real){
-			exit_error(501);
-		}
-
-		free(path);
-	}
-
-	// ensure we didn't escape the quote root somehow.
-	if(strncmp(real, QUOTES_ROOT, sizeof(QUOTES_ROOT) - 1) != 0){
-		exit_error(400);
+	if(asprintf(&qset.path, QUOTES_ROOT "/data-%s", name) == -1 || !qset.path){
+		exit_error(501);
 	}
 
 	int flags = O_RDWR | O_CREAT | O_EXCL;
@@ -100,7 +90,7 @@ struct qset qset_create(const char* name){
 retry_open:;
 
 	// create / open the file
-	qset.fd = open(real, flags, 666);
+	qset.fd = open(qset.path, flags, 0666);
 	if(qset.fd == -1){
 		if(errno == EEXIST){
 			flags = O_RDWR;
@@ -124,6 +114,7 @@ retry_open:;
 
 void qset_free(struct qset* q){
 	free(q->mem);
+	free(q->path);
 	sb_free(q->lines);
 	if(q->fd != -1){
 		close(q->fd);

@@ -61,7 +61,7 @@ void util_output(const char* data, size_t len, int type, time_t mod){
 		}
 	}
 
-	printf("Cache-Control: public, max-age=31536000\r\n");
+	//printf("Cache-Control: public, max-age=31536000\r\n");
 	printf("\r\n%.*s\n", (int)len, data);
 }
 

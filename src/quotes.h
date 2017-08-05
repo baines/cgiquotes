@@ -35,6 +35,7 @@ struct qset {
 	const char*     name;
 	const char*     display; // TODO;
 	int             fd;
+	char*           path;
 	time_t          last_mod;
 };
 
