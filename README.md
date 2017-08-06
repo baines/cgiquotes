@@ -13,7 +13,7 @@ text     :: *(any char except '\n')
 ```
 
 Edit quotes.h to change the location of `QUOTES_ROOT`, and add files there
-named data-\<name\>. Make sure the name is html-safe and the dir has rw permissions.
+named \#name. Make sure the name is html-safe and the dir has rw permissions.
 
 It also now supports POST and DELETE to add/edit/delete quotes remotely.
 For this to work, you need to choose a random username + password, concat them

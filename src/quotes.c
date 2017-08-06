@@ -6,6 +6,8 @@
 #include <sys/types.h>
 #include <sys/xattr.h>
 #include <sys/stat.h>
+#include <sys/sendfile.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <time.h>
 #include <glob.h>
@@ -189,29 +191,56 @@ void hande_get_multi(struct qset* q, int type){
 	sb_free(qdata);
 }
 
-void handle_get_index(void){
+void handle_get_index(int type){
+
+	struct stat dir_st;
+	if(stat(QUOTES_ROOT, &dir_st) == -1){
+		exit_error(501);
+	}
 
 	glob_t glob_data;
-	if(glob(QUOTES_ROOT "/data-*", 0, NULL, &glob_data) != 0){
+	if(glob(QUOTES_ROOT "/#*", 0, NULL, &glob_data) != 0){
 		exit_error(501);
 	}
 
-	char* p;
-	size_t sz;
-	FILE* f = open_memstream(&p, &sz);
+	if(type == RESPONSE_RAW){
+		const char* enc = getenv("HTTP_ACCEPT_ENCODING");
+		printf("Vary: Accept-Encoding\r\n");
+		if(!enc || !strstr(enc, "gzip")){
+			exit_error(406);
+		}
 
-	for(size_t i = 0; i < glob_data.gl_pathc; ++i){
-		fprintf(f, "\t\t<a href=\"/quotes/%1$s\">%1$s</a>\n", basename(glob_data.gl_pathv[i]) + 5);
+		util_headers(RESPONSE_RAW, dir_st.st_mtim.tv_sec);
+
+		for(size_t i = 0; i < glob_data.gl_pathc; ++i){
+			int fd = open(glob_data.gl_pathv[i], O_RDONLY | O_NOFOLLOW);
+			struct stat st;
+
+			if(fd == -1 || fstat(fd, &st) == -1){
+				exit_error(501);
+			}
+
+			printf("%s\n", basename(glob_data.gl_pathv[i]));
+			fflush(stdout);
+			splice(fd, NULL, STDOUT_FILENO, NULL, st.st_size, 0);
+			fflush(stdout);
+
+			close(fd);
+		}
+	} else {
+		char* p;
+		size_t sz;
+		FILE* f = open_memstream(&p, &sz);
+
+		for(size_t i = 0; i < glob_data.gl_pathc; ++i){
+			fprintf(f, "\t\t<a href=\"/quotes/%1$s\">%1$s</a>\n", basename(glob_data.gl_pathv[i]) + 1);
+		}
+		fclose(f);
+
+		const char* vals[] = { "qdata", p, NULL };
+		template_puts(GETBIN(index_html), vals, RESPONSE_HTML, dir_st.st_mtim.tv_sec);
 	}
-	fclose(f);
 
-	struct stat st;
-	if(stat(QUOTES_ROOT, &st) == -1){
-		exit_error(501);
-	}
-
-	const char* vals[] = { "qdata", p, NULL };
-	template_puts(GETBIN(index_html), vals, RESPONSE_HTML, st.st_mtim.tv_sec);
 	globfree(&glob_data);
 }
 
@@ -270,7 +299,7 @@ void handle_post(struct qset* q, int id){
 		int id = 0;
 		sb_each(l, q->lines){
 			int i = atoi(*l);
-			if(i > id) id = (i+1);
+			if(i >= id) id = (i+1);
 		}
 
 		lseek(q->fd, 0, SEEK_END);
@@ -395,7 +424,8 @@ int main(void){
 
 	if(n <= 0){
 		if(strcmp(method, "GET") == 0){
-			handle_get_index();
+			sscanf(path, "/quotes/.%7s", req_type);
+			handle_get_index(get_resp_type(req_type));
 			return 0;
 		} else {
 			exit_error(400);

@@ -1,7 +1,7 @@
 #include "quotes.h"
 #include <dirent.h>
-#include <fcntl.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -17,6 +17,8 @@ void util_exit(int http_code){
 			msg = "Unauthorized"; break;
 		case 404:
 			msg = "Not Found"; break;
+		case 406:
+			msg = "Not Acceptable"; break;
 	}
 
 	char errbuf[8] = "";
@@ -47,7 +49,7 @@ static const char* response_mime[] = {
 	[RESPONSE_RAW]  = "text/plain",
 };
 
-void util_output(const char* data, size_t len, int type, time_t mod){
+void util_headers(int type, time_t mod){
 	printf("Content-Type: %s; charset=utf-8\r\n", response_mime[type]);
 
 	if(mod){
@@ -62,6 +64,11 @@ void util_output(const char* data, size_t len, int type, time_t mod){
 	}
 
 	//printf("Cache-Control: public, max-age=31536000\r\n");
-	printf("\r\n%.*s\n", (int)len, data);
+	printf("\r\n");
+}
+
+void util_output(const char* data, size_t len, int type, time_t mod){
+	util_headers(type, mod);
+	printf("%.*s\n", (int)len, data);
 }
 

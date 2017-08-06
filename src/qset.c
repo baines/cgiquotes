@@ -45,10 +45,9 @@ struct qset qset_open(const char* name){
 
 	struct dirent* e;
 	while((e = readdir(dir))){
-		if(e->d_name[0] == '.') continue;
-		if(strncmp(e->d_name, "data-", 5) != 0) continue;
+		if(e->d_name[0] != '#') continue;
 
-		if(strcmp(e->d_name + 5, name) == 0 && e->d_type == DT_REG){
+		if(strcmp(e->d_name + 1, name) == 0 && e->d_type == DT_REG){
 			qset.fd = openat(dirfd(dir), e->d_name, O_RDWR);
 			if(asprintf(&qset.path, QUOTES_ROOT "/%s", e->d_name) == -1){
 				exit_error(501);
@@ -73,7 +72,7 @@ struct qset qset_open(const char* name){
 }
 
 struct qset qset_create(const char* name){
-	if(strpbrk(name, "./")){
+	if(strpbrk(name, "./<>&'\"#;:@=")){
 		exit_error(400);
 	}
 
@@ -81,7 +80,7 @@ struct qset qset_create(const char* name){
 		.name = strdup(name),
 	};
 
-	if(asprintf(&qset.path, QUOTES_ROOT "/data-%s", name) == -1 || !qset.path){
+	if(asprintf(&qset.path, QUOTES_ROOT "/#%s", name) == -1 || !qset.path){
 		exit_error(501);
 	}
 

@@ -16,6 +16,7 @@ struct qset;
 void         util_exit       (int http_code);
 const char*  util_getenv     (const char* name);
 void         util_output     (const char* data, size_t len, int type, time_t mod);
+void         util_headers    (int type, time_t mod);
 
 struct qset  qset_open       (const char* name);
 struct qset  qset_create     (const char* name);
