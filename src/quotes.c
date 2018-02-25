@@ -313,7 +313,7 @@ void handle_post(struct qset* q, int id){
 		int text_offset = -1;
 
 		// make sure post data is of the form '[epoch]:[text]'
-		bool valid = sscanf(buf, "%zu:%n", &epoch, &text_offset) == 1;
+		bool valid = sscanf(buf, "%zu:%n", &epoch, &text_offset) == 1 && text_offset != -1;
 		if(!valid && *buf == ':'){
 			text_offset = 1;
 		} else if(!valid){
@@ -341,7 +341,7 @@ void handle_post(struct qset* q, int id){
 				exit_error(501);
 			}
 
-			text = (text_offset <= 0) ? q->lines[line] + old_off : buf + text_offset;
+			text = !buf[text_offset] ? q->lines[line] + old_off : buf + text_offset;
 			if(epoch == 0){
 				epoch = old_epoch;
 			}
