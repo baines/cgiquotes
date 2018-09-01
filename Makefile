@@ -4,7 +4,7 @@ objs   := $(srcs:src/%.c=build/%.o) $(html:src/%.html=build/%.html.o)
 CFLAGS := -std=gnu99 -D_GNU_SOURCE -g -Wall -Wextra -Werror -Wno-missing-field-initializers
 
 cgi-bin/quotes: $(objs) | cgi-bin
-	$(CC) $^ -o $@ -lrt
+	$(CC) $^ -o $@ -lrt -lm
 
 cgi-bin build:
 	mkdir $@

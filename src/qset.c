@@ -55,18 +55,22 @@ struct qset qset_open(const char* name){
 			break;
 		}
 	}
-	closedir(dir);
 
 	if(qset.fd == -1){
 		exit_error(404);
 	}
+
 	struct stat st;
 	if(fstat(qset.fd, &st) == -1){
 		exit_error(501);
 	}
+
 	qset.last_mod = st.st_mtim.tv_sec;
-	
 	qset_load_lines(&qset);
+
+	rating_init(dir, &qset);
+
+	closedir(dir);
 
 	return qset;
 }
