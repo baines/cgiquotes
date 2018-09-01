@@ -22,6 +22,7 @@ void         util_headers    (int type, time_t mod);
 
 struct qset  qset_open       (const char* name);
 struct qset  qset_create     (const char* name);
+void         qset_sort       (struct qset*, int ordering[static 4]);
 void         qset_free       (struct qset*);
 
 sb(char)     template_bake   (const char* data, size_t, const char** subst);

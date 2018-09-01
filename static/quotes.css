@@ -171,27 +171,24 @@ tr {
     font-size: 20px;
 }
 
-td {
+td, th {
     padding: 5px;
-}
-
-td {
     border-width: 2px 0 2px 0;
     border-style: solid;
     border-color: #113c51;
 }
 
-thead td {
+th {
     background-color: #d4a36a;
     border-width: 2px 2px 2px 0;
 }
 
-td:first-child {
+td:first-child, th:first-child {
     border-left: 2px solid #113c51;
-    width: 15px;
+    width: 45px;
 }
 
-td:last-child {
+td:last-child, th:last-child {
     border-right: 2px solid #113c51;
     width: 95px;
 }

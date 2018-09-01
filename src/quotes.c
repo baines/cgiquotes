@@ -132,6 +132,9 @@ void hande_get_multi(struct qset* q, int type){
 	char rate_buf  [32]  = "";
 	char quote_buf [512] = "";
 
+	char th_buf  [4][64];
+	memset(th_buf, 0, sizeof(th_buf));
+
 	const char* tvals[] = {
 		"qnum" , id_buf,
 		"qtext", quote_buf,
@@ -139,6 +142,10 @@ void hande_get_multi(struct qset* q, int type){
 		"qdate", date_buf,
 		"qname", q->name,
 		"qrate", rate_buf,
+		"th0"  , th_buf[0],
+		"th1"  , th_buf[1],
+		"th2"  , th_buf[2],
+		"th3"  , th_buf[3],
 		"qdata", "",
 		NULL
 	};
@@ -155,6 +162,36 @@ void hande_get_multi(struct qset* q, int type){
 		[RESPONSE_JSON] = { tjson, sizeof(tjson)-1, "[`qdata`]", 9 },
 		[RESPONSE_CSV]  = { tcsv , sizeof(tcsv) -1, "`qdata`", 7 },
 	};
+
+	// sorting by query param
+	{
+		int ordering[4];
+		qset_sort(q, ordering);
+
+		static const struct th {
+			const char* id;
+			const char* heading;
+		} th[] = {
+			{ "id"    , "ID" },
+			{ "text"  , "Quote" },
+			{ "date"  , "Date" },
+			{ "rating", "Rating" },
+		};
+
+		for(int i = 0; i < 4; ++i){
+			char dir = '-';
+			const char* sym = "";
+
+			if(ordering[i] > 0){
+				sym = " &#x23F7;";
+				dir = '+';
+			} else if(ordering[i] < 0){
+				sym = " &#x23F6;";
+			}
+
+			snprintf(th_buf[i], sizeof(th_buf[i]), "<a href=\"?sort=%c%s\">%s%s</a>", dir, th[i].id, th[i].heading, sym);
+		}
+	}
 
 	if(type == RESPONSE_RAW){
 		sb_each(l, q->lines){
