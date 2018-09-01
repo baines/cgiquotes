@@ -190,6 +190,9 @@ td:first-child, th:first-child {
 
 td:last-child, th:last-child {
     border-right: 2px solid #113c51;
+}
+
+td:nth-child(3), th:nth-child(3) {
     width: 95px;
 }
 
