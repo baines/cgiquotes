@@ -12,6 +12,7 @@
 #include <time.h>
 #include <glob.h>
 #include <errno.h>
+#include <math.h>
 #include "quotes.h"
 
 void check_auth(void){
@@ -122,17 +123,17 @@ void handle_get_single(struct qset* q, int id, int type){
 
 void hande_get_multi(struct qset* q, int type){
 
-	static const char thtml[] =
-		"\t\t\t<tr><td><a href=\"`qnum`\">`qnum`</a></td>"
-		"<td><a href=\"`qnum`\">`qtext|h`</a></td>"
-		"<td>`qdate`</td>\n";
 	static const char tjson[] =	"{\"id\": `qnum`, \"ts\": `qts`, \"text\": \"`qtext|j`\"},\n";
 	static const char tcsv[]  = "`qnum`,`qts`,\"`qtext|c`\"\n";
 
 	char ts_buf    [32]  = "";
 	char date_buf  [32]  = "";
 	char id_buf    [32]  = "";
+	char rate_buf  [32]  = "";
 	char quote_buf [512] = "";
+
+	char th_buf  [4][64];
+	memset(th_buf, 0, sizeof(th_buf));
 
 	const char* tvals[] = {
 		"qnum" , id_buf,
@@ -140,6 +141,11 @@ void hande_get_multi(struct qset* q, int type){
 		"qts"  , ts_buf,
 		"qdate", date_buf,
 		"qname", q->name,
+		"qrate", rate_buf,
+		"th0"  , th_buf[0],
+		"th1"  , th_buf[1],
+		"th2"  , th_buf[2],
+		"th3"  , th_buf[3],
 		"qdata", "",
 		NULL
 	};
@@ -152,10 +158,40 @@ void hande_get_multi(struct qset* q, int type){
 		const char* tmain;
 		size_t tmain_sz;
 	} templates[] = {
-		[RESPONSE_HTML] = { thtml, sizeof(thtml)-1, GETBIN(multi_html) },
+		[RESPONSE_HTML] = { GETBIN(multi_row_html), GETBIN(multi_html) },
 		[RESPONSE_JSON] = { tjson, sizeof(tjson)-1, "[`qdata`]", 9 },
 		[RESPONSE_CSV]  = { tcsv , sizeof(tcsv) -1, "`qdata`", 7 },
 	};
+
+	// sorting by query param
+	{
+		int ordering[4];
+		qset_sort(q, ordering);
+
+		static const struct th {
+			const char* id;
+			const char* heading;
+		} th[] = {
+			{ "id"    , "ID" },
+			{ "text"  , "Quote" },
+			{ "date"  , "Date" },
+			{ "rating", "Rating" },
+		};
+
+		for(int i = 0; i < 4; ++i){
+			char dir = '-';
+			const char* sym = "";
+
+			if(ordering[i] > 0){
+				sym = " &#x23F7;";
+				dir = '+';
+			} else if(ordering[i] < 0){
+				sym = " &#x23F6;";
+			}
+
+			snprintf(th_buf[i], sizeof(th_buf[i]), "<a href=\"?sort=%c%s\">%s%s</a>", dir, th[i].id, th[i].heading, sym);
+		}
+	}
 
 	if(type == RESPONSE_RAW){
 		sb_each(l, q->lines){
@@ -171,10 +207,18 @@ void hande_get_multi(struct qset* q, int type){
 			if(sscanf(*l, "%7[0-9],%31[0-9],%511[^\n]", id_buf, ts_buf, quote_buf) != 3){
 				exit_error(501);
 			}
+
 			struct tm tm = {};
 			time_t tt = strtoul(ts_buf, NULL, 10);
 			gmtime_r(&tt, &tm);
 			strftime(date_buf, sizeof(date_buf), "%F", &tm);
+
+			struct rating r;
+			uint32_t id = strtoul(id_buf, NULL, 10);
+			rating_get(q, &r, id);
+
+			snprintf(rate_buf, sizeof(rate_buf), "r%1X", (int)roundf(r.rating));
+
 			template_append(&qdata, t->trow, t->trow_sz, tvals);
 		}
 
@@ -400,6 +444,43 @@ void handle_delete(struct qset* q, int id){
 	puts("Content-Type: text/plain; charset=utf-8\r\n\r");
 }
 
+void handle_rate(struct qset* q){
+	char buf[256] = "";
+	fgets(buf, sizeof(buf), stdin);
+
+	int qnum, x;
+	if(sscanf(buf, "q%d.x=%d", &qnum, &x) != 2){
+		exit_error(400);
+	}
+
+	if(x < 0 || x > 100 || qnum < 0){
+		exit_error(400);
+	}
+
+	int rating = roundf(x / 20.0f) * 2;
+
+	bool found = false;
+	sb_each(l, q->lines){
+		int n = atoi(*l);
+		if(n == qnum){
+			found = true;
+			break;
+		}
+	}
+
+	if(!found){
+		exit_error(404);
+	}
+
+	struct rating r;
+	rating_get(q, &r, qnum);
+
+	const char* ip = util_getenv("REMOTE_ADDR");
+	rating_set(q, &r, ip, rating);
+
+	printf("Status: 303 See Other\r\nLocation: /quotes/%s\r\n\r\n", q->name);
+}
+
 int get_resp_type(const char* req){
 	if(strcasecmp(req, "json") == 0) return RESPONSE_JSON;
 	if(strcasecmp(req, "csv" ) == 0) return RESPONSE_CSV;
@@ -436,14 +517,21 @@ int main(void){
 
 	int resp_type = get_resp_type(req_type);
 
-	if(strchr(id_str, 'r')){
-		id = Q_ID_RANDOM;
-	} else if(*id_str){
-		id = atoi(id_str);
-	}
-
 	for(char* c = filename; *c; ++c){
 		*c = tolower(*c);
+	}
+
+	if(strchr(id_str, 'r')){
+		id = Q_ID_RANDOM;
+
+		if(strcmp(method, "POST") == 0){
+			struct qset q = qset_open(filename);
+			handle_rate(&q);
+			return 0;
+		}
+
+	} else if(*id_str){
+		id = atoi(id_str);
 	}
 
 	/****/ if(strcmp(method, "GET") == 0){

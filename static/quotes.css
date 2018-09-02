@@ -158,7 +158,7 @@ table {
     border-collapse: separate;
     border-spacing: 0 10px;
     min-width: 50%;
-    max-width: 800px;
+    max-width: 900px;
     margin: 20px auto;
     text-align: center;
 }
@@ -167,35 +167,32 @@ tr {
     margin: 5px;
     background-color: #ffd8aa;
     padding: 20px;
-    max-width: 700px;
+    max-width: 800px;
     font-size: 20px;
 }
 
-td {
+td, th {
     padding: 5px;
-}
-
-td {
     border-width: 2px 0 2px 0;
     border-style: solid;
     border-color: #113c51;
 }
 
-thead td {
+th {
     background-color: #d4a36a;
+    border-width: 2px 2px 2px 0;
 }
 
-thead td:nth-child(2) {
-    border-width: 2px;
-}
-
-td:first-child {
+td:first-child, th:first-child {
     border-left: 2px solid #113c51;
-    width: 15px;
+    width: 45px;
 }
 
-td:last-child {
+td:last-child, th:last-child {
     border-right: 2px solid #113c51;
+}
+
+td:nth-child(3), th:nth-child(3) {
     width: 95px;
 }
 
@@ -245,3 +242,19 @@ main>h3 {
 main>h3 {
     font-size: 300%;
 }
+
+input[type="image"] {
+	object-fit: none;
+}
+
+.r0 { object-position: 0 0; }
+.r1 { object-position: 0 -20px; }
+.r2 { object-position: 0 -40px; }
+.r3 { object-position: 0 -60px; }
+.r4 { object-position: 0 -80px; }
+.r5 { object-position: 0 -100px; }
+.r6 { object-position: 0 -120px; }
+.r7 { object-position: 0 -140px; }
+.r8 { object-position: 0 -160px; }
+.r9 { object-position: 0 -180px; }
+.rA { object-position: 0 -200px; }
