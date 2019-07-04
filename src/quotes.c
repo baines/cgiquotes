@@ -266,8 +266,18 @@ void handle_get_index(int type){
 
 			printf("%s\n", basename(glob_data.gl_pathv[i]));
 			fflush(stdout);
-			splice(fd, NULL, STDOUT_FILENO, NULL, st.st_size, 0);
-			fflush(stdout);
+
+			loff_t off_in = 0;
+			ssize_t tot = 0;
+
+			do {
+				ssize_t n = splice(fd, &off_in, STDOUT_FILENO, NULL, st.st_size - tot, 0);
+				if(n == -1) {
+					exit_error(500);
+				}
+				tot += n;
+				fflush(stdout);
+			} while(tot < st.st_size);
 
 			close(fd);
 		}

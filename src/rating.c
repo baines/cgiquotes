@@ -23,8 +23,8 @@ static uint32_t murmur2(const void* key, int len, uint32_t seed){
 	}
 
 	switch(len){
-		case 3: h ^= data[2] << 16;
-		case 2: h ^= data[1] << 8;
+		case 3: h ^= data[2] << 16; /* fall-thru */
+		case 2: h ^= data[1] << 8; /* fall-thru */
 		case 1: h ^= data[0];
 		        h *= m;
 	};
